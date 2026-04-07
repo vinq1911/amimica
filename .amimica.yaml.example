@@ -1,0 +1,139 @@
+# .amimica.yaml — Example Amimica configuration file.
+# Copy this file to .amimica.yaml and customize as needed.
+# All settings have sensible defaults; only override what you need.
+#
+# Environment variable overrides: every key can be set via AMIMICA_<SECTION>_<KEY>.
+# Example: AMIMICA_ANALYSIS_NORMALIZATION_LEVEL=semantic
+version: 1
+
+analysis:
+  # normalization_level controls how aggressively code is abstracted before comparison.
+  # Options: raw | light | strong | semantic
+  # - raw:      Strip whitespace/comments only. Detects exact (Type-1) clones.
+  # - light:    Replace literals with placeholders. Detects clones differing in values.
+  # - strong:   Replace local identifiers. Detects renamed (Type-2) clones.
+  # - semantic: Abstract selectors and types. Detects cross-domain structural clones.
+  normalization_level: strong
+
+  # min_statements is the minimum number of statements required in a unit.
+  # Units smaller than this are skipped to reduce noise.
+  min_statements: 3
+
+  # min_lines is the minimum number of lines in a source region to consider.
+  min_lines: 6
+
+  # window_size is the number of consecutive statements in each sliding window.
+  window_size: 5
+
+  # window_min_function_size is the minimum function size (in statements) to
+  # apply sliding window extraction. Avoids extracting windows from tiny functions.
+  window_min_function_size: 8
+
+  # thorough enables subtree extraction and rolling hash (slower, more thorough).
+  thorough: false
+
+  # shingle_size is the n-gram size for token shingle computation.
+  shingle_size: 7
+
+  # minhash_functions is the number of hash functions for MinHash signatures.
+  # More functions = lower approximation error but higher memory usage.
+  minhash_functions: 128
+
+  # lsh_bands is the number of bands for Locality-Sensitive Hashing.
+  lsh_bands: 16
+
+  # lsh_rows is the number of rows per band in LSH.
+  lsh_rows: 8
+
+scoring:
+  # min_score is the minimum composite score for a finding to be reported.
+  # Range: 0.0-1.0. Increase to see only the most significant clones.
+  min_score: 0.15
+
+  # max_findings caps the total number of findings reported.
+  max_findings: 100
+
+  # weights control the relative importance of each scoring dimension.
+  # All weights should sum to approximately 1.0.
+  weights:
+    similarity: 0.30
+    impact: 0.25
+    refactorability: 0.20
+    repetition: 0.15
+    confidence: 0.10
+
+  # penalties are multiplicative factors applied to reduce scores for less actionable findings.
+  penalties:
+    test_code: 0.5          # Clones in *_test.go files
+    generated_code: 0.3     # Clones in files with "Code generated" marker
+    small_region: 0.7       # Regions with fewer than 5 statements
+    single_error_check: 0.6 # Pure "if err != nil { return err }" patterns
+    same_function: 0.8      # Clones within the same function
+
+paths:
+  # include is a list of glob patterns for files to analyze.
+  include:
+    - "**/*.go"
+
+  # exclude is a list of glob patterns for files to skip.
+  exclude:
+    - "vendor/**"
+    - "**/*.pb.go"
+    - "**/mock_*.go"
+    - "**/zz_generated*.go"
+
+  # include_tests controls whether test files (*_test.go) are analyzed.
+  # When true, test files are included but receive a scoring penalty.
+  include_tests: true
+
+  # include_vendor controls whether the vendor/ directory is analyzed.
+  include_vendor: false
+
+  # include_generated controls whether files with "Code generated" markers are analyzed.
+  include_generated: false
+
+  # follow_symlinks controls whether symbolic links are followed during file discovery.
+  follow_symlinks: false
+
+cache:
+  # enabled controls whether the content-hash cache is used.
+  # The cache dramatically speeds up repeated scans of slowly-changing repositories.
+  enabled: true
+
+  # dir is the cache directory path, relative to the scan root.
+  dir: ".amimica/cache"
+
+output:
+  # format controls the output encoding.
+  # Options: text | json | sarif | markdown
+  format: text
+
+  # file is the output file path. Empty means write to stdout.
+  file: ""
+
+  # sort_by controls how findings are ordered in the output.
+  # Options: score | lines | regions | file
+  sort_by: score
+
+  # show_suppressed controls whether noise-suppressed findings are included in output.
+  show_suppressed: false
+
+performance:
+  # jobs is the number of parallel workers. 0 means use GOMAXPROCS.
+  jobs: 0
+
+  # max_file_size is the maximum file size in bytes. Files larger than this are skipped.
+  # Default: 1MB (1048576 bytes)
+  max_file_size: 1048576
+
+  # max_units_per_file is a safety limit on units extracted from a single file.
+  max_units_per_file: 1000
+
+logging:
+  # level controls the minimum log severity.
+  # Options: debug | info | warn | error
+  level: info
+
+  # format controls the log output encoding.
+  # Options: text | json
+  format: text
