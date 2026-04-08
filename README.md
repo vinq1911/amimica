@@ -161,133 +161,97 @@ The server reads JSON-RPC from stdin and writes responses to stdout. Logs go to 
 - **Protocol version**: `2024-11-05`
 - **Capabilities**: `tools`
 
+### Output codes
+
+MCP output is token-optimized. All tools use short codes:
+
+**Clone types:**
+
+| Code | Meaning |
+|------|---------|
+| `EX` | Exact — identical code |
+| `RN` | Renamed — same structure, different identifiers |
+| `ND` | Near-duplicate — similar with small differences |
+| `PT` | Pattern — recurring structural idiom |
+
+**Refactor hints** (shown as `→XX`):
+
+| Code | Meaning |
+|------|---------|
+| `EH` | Extract helper function |
+| `TD` | Table-driven refactor |
+| `IE` | Interface extraction |
+| `GF` | Generic function |
+| `SV` | Shared validator |
+| `AM` | Adapter/mapper |
+| `CD` | Config-driven |
+
+**Score fields** in explain: `conf=` confidence, `sim=` similarity, `imp=` impact, `ref=` refactorability.
+
 ### Tools
 
 #### `scan`
 
-Scan directories for code clones. Returns a human-readable summary and a `scan_id` for follow-up queries.
+Scan directories for code clones. Returns compact summary + `scan_id`.
 
-**Input:**
-
-```json
-{
-  "paths": ["./src", "./lib"],
-  "min_score": 0.5,
-  "max_results": 20
-}
-```
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `paths` | `string[]` | No | Directories to scan. Default: `["."]` |
-| `min_score` | `number` | No | Minimum confidence score (0.0-1.0). Default: 0.15 |
-| `max_results` | `integer` | No | Max findings. 0 = no limit. |
-
-**Output:** Text summary including:
-- File/function/unit counts and scan duration
-- Top findings with scores, regions, clone types, and refactor suggestions
-- A `scan_id` (e.g., `scan-1`) for use with `list_findings` and `explain_finding`
+**Input:** `paths` (string[], default `[".""]`), `min_score` (number), `max_results` (int)
 
 **Example output:**
 ```
-Scanned 371 files (1265 functions, 7128 units) in 567ms.
-Found 42 clone classes (scan_id: scan-1).
-
-#1 Score: 0.96 | renamed | 6 regions
-   worker/sip_mid_dialog.go:152-162 handleUPDATE
-   worker/sip_mid_dialog.go:165-174 handleINFO
-   worker/sip_mid_dialog.go:251-261 handlePRACK
-   ...
-   → Identical structure repeated 6 times in the same package. Consider a table-driven approach.
+53 files 253 funcs 112ms | 17 clones | sid:scan-1
+#1 0.72 ND 2r →EH
+  internal/trunk/store.go:349-373 syncTrunkList
+  internal/trunk/store.go:376-400 syncOperatorList
+#2 0.67 ND 2r →EH
+  internal/events/events.go:34-49 ToMap
+  internal/events/events.go:63-77 ToMap
++12 more → list_findings sid:scan-1
 ```
+
+Reading: `#1 0.72 ND 2r →EH` = finding #1, score 0.72, near-duplicate, 2 regions, suggest extract-helper.
 
 #### `list_findings`
 
-Browse findings from a previous scan with pagination and filtering.
+Paginated findings from a scan with IDs for follow-up.
 
-**Input:**
+**Input:** `scan_id` (required), `min_score`, `limit` (default 20), `offset`
 
-```json
-{
-  "scan_id": "scan-1",
-  "min_score": 0.5,
-  "limit": 10,
-  "offset": 0
-}
+**Example output:**
 ```
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `scan_id` | `string` | **Yes** | Scan ID from a previous `scan` call |
-| `min_score` | `number` | No | Filter by minimum score |
-| `limit` | `integer` | No | Max findings to return. Default: 20 |
-| `offset` | `integer` | No | Skip first N findings (pagination) |
-
-**Output:** Paginated list of findings with IDs, scores, regions, and refactor hints.
+#6 F-0f7071ff85 0.68 RN 2r →EH
+  rtp.go:277-303 decodePCMA
+  codecs/pcma.go:12-38 DecodePCMA
+```
 
 #### `explain_finding`
 
-Get a detailed breakdown of a specific clone finding.
+Detailed breakdown of one finding. Normalized form truncated by default.
 
-**Input:**
+**Input:** `scan_id` (required), `finding_id` (required), `verbose` (bool, default false — set true for full normalized form)
 
-```json
-{
-  "scan_id": "scan-1",
-  "finding_id": "F-a1b2c3d4e5"
-}
+**Example output:**
 ```
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `scan_id` | `string` | **Yes** | Scan ID from a previous `scan` call |
-| `finding_id` | `string` | **Yes** | Finding ID (shown in scan/list output) |
-
-**Output:** Detailed explanation including:
-- Clone type and normalization level
-- Score breakdown (confidence, similarity, impact, refactorability)
-- All matched regions with file paths and line ranges
-- Normalized form (the abstracted code pattern that matched)
-- Refactoring suggestions with confidence levels
-- Applied penalties
+F-73696bd249 ND 0.72 conf=0.80 sim=1.00 imp=0.33 ref=1.00
+  internal/trunk/store.go:349-373 syncTrunkList
+  internal/trunk/store.go:376-400 syncOperatorList
+norm: ($R * TrunkStore) func $FUNC ($P0 $V0.Context) (error) {$V1, $V2 := $R.db.DB.QueryContext... (set verbose:true for full)
+hint: EH 75% Two regions with identical normalized structure. Extract a shared helper function.
+penalties: only 2 members(×0.9)
+```
 
 #### `compare_regions`
 
-View two code regions side by side. Useful for manually inspecting a finding.
+Side-by-side source code from two regions.
 
-**Input:**
+**Input:** `file_a`, `start_line_a`, `end_line_a`, `file_b`, `start_line_b`, `end_line_b` (all required)
 
-```json
-{
-  "file_a": "src/handlers/user.go",
-  "start_line_a": 24,
-  "end_line_a": 68,
-  "file_b": "src/handlers/product.go",
-  "start_line_b": 18,
-  "end_line_b": 62
-}
-```
+### MCP workflow
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `file_a` | `string` | **Yes** | Path to first file |
-| `start_line_a` | `integer` | **Yes** | Start line in first file |
-| `end_line_a` | `integer` | **Yes** | End line in first file |
-| `file_b` | `string` | **Yes** | Path to second file |
-| `start_line_b` | `integer` | **Yes** | Start line in second file |
-| `end_line_b` | `integer` | **Yes** | End line in second file |
-
-**Output:** The source code from both regions, labeled.
-
-### MCP workflow example
-
-A typical AI-assisted code review session:
-
-1. **Scan** the project: `scan` with `paths: ["."]` — get `scan_id: "scan-1"`
-2. **Browse** findings: `list_findings` with `scan_id: "scan-1"`, `min_score: 0.5`
-3. **Investigate** a finding: `explain_finding` with `finding_id: "F-a1b2c3d4e5"`
-4. **Compare** the regions: `compare_regions` with the file paths and line numbers
-5. **Suggest** refactoring based on the clone type and refactor hints
+1. **`scan`** with `paths: ["."]` → get `scan_id`
+2. **`list_findings`** with `scan_id`, `min_score: 0.5` → browse results with finding IDs
+3. **`explain_finding`** with `finding_id` → understand the clone
+4. **`compare_regions`** with file paths and line numbers → see actual code
+5. Suggest refactoring based on clone type and hints
 
 ### Session model
 
