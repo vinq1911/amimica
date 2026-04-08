@@ -108,6 +108,38 @@ Exit codes:
   3  Analysis error
 ```
 
+## MCP server
+
+Amimica can run as an MCP server for Claude Code and other MCP clients.
+
+### Setup
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "amimica": {
+      "command": "/path/to/amimica",
+      "args": ["serve-mcp"]
+    }
+  }
+}
+```
+
+### Tools
+
+| Tool | Description |
+|------|-------------|
+| `scan` | Scan directories for clones. Returns summary + `scan_id`. |
+| `list_findings` | Paginated findings from a previous scan. |
+| `explain_finding` | Detailed explanation of a specific finding. |
+| `compare_regions` | Side-by-side view of two code regions. |
+
+### Skills
+
+Copy `skills/*.md` to `~/.claude/skills/` for Claude Code to learn Amimica usage patterns.
+
 ## Ignoring findings
 
 Add an `amimica-ignore` comment above any function to exclude it from analysis:

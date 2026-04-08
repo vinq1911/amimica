@@ -57,7 +57,9 @@ func main() {
 		fmt.Printf("amimica version %s (commit %s, built %s)\n", version, commit, buildDate)
 	case "scan":
 		os.Exit(app.RunScan(args[1:]))
-	case "report", "explain", "diff", "serve-mcp":
+	case "serve-mcp":
+		os.Exit(app.RunServeMCP(args[1:]))
+	case "report", "explain", "diff":
 		fmt.Fprintf(os.Stderr, "amimica: command %q not implemented yet\n", args[0])
 		os.Exit(1)
 	default:
