@@ -1,6 +1,9 @@
 package model
 
-import "go/token"
+import (
+	"encoding/json"
+	"go/token"
+)
 
 // NormalizationLevel controls how aggressively source code is normalized before
 // comparison. Higher levels abstract more details, detecting more classes of clones
@@ -39,6 +42,9 @@ func (l NormalizationLevel) String() string {
 		return "unknown"
 	}
 }
+
+// MarshalJSON encodes NormalizationLevel as its string name.
+func (l NormalizationLevel) MarshalJSON() ([]byte, error) { return json.Marshal(l.String()) }
 
 // Token represents a single token from the original Go source code before normalization.
 type Token struct {

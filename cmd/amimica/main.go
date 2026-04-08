@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/user/amimica/internal/logging"
+	"github.com/user/amimica/internal/app"
 )
 
 // Build-time variables injected via ldflags. See Makefile.
@@ -52,14 +52,13 @@ func main() {
 		os.Exit(2)
 	}
 
-	log := logging.Setup("info", "text")
-	_ = log
-
 	switch args[0] {
 	case "version":
 		fmt.Printf("amimica version %s (commit %s, built %s)\n", version, commit, buildDate)
-	case "scan", "report", "explain", "diff", "serve-mcp":
-		fmt.Fprintf(os.Stderr, "amimica: command %q not implemented\n", args[0])
+	case "scan":
+		os.Exit(app.RunScan(args[1:]))
+	case "report", "explain", "diff", "serve-mcp":
+		fmt.Fprintf(os.Stderr, "amimica: command %q not implemented yet\n", args[0])
 		os.Exit(1)
 	default:
 		fmt.Fprintf(os.Stderr, "amimica: unknown command %q\n", args[0])

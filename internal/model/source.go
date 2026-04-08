@@ -37,26 +37,13 @@ type SourceFile struct {
 // SourceRegion identifies a contiguous span of source code within a file.
 // Regions are used to pinpoint where clones were detected.
 type SourceRegion struct {
-	// File is the relative file path within the scan root.
-	File string
-
-	// StartLine is the 1-based line number where the region begins.
-	StartLine int
-
-	// EndLine is the 1-based line number where the region ends (inclusive).
-	EndLine int
-
-	// StartCol is the 1-based column offset of the first character.
-	StartCol int
-
-	// EndCol is the 1-based column offset of the last character.
-	EndCol int
-
-	// FuncName is the name of the enclosing function or method, if any.
-	FuncName string
-
-	// Receiver is the receiver type name for methods (e.g., "*UserService").
-	Receiver string
+	File      string `json:"file"`
+	StartLine int    `json:"start_line"`
+	EndLine   int    `json:"end_line"`
+	StartCol  int    `json:"start_col,omitempty"`
+	EndCol    int    `json:"end_col,omitempty"`
+	FuncName  string `json:"func_name,omitempty"`
+	Receiver  string `json:"receiver,omitempty"`
 }
 
 // ParseError records a single non-fatal parse error encountered in a source file.

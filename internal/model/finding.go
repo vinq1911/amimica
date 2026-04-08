@@ -1,5 +1,7 @@
 package model
 
+import "encoding/json"
+
 // CloneType classifies the kind of code clone detected.
 type CloneType int
 
@@ -38,6 +40,9 @@ func (t CloneType) String() string {
 	}
 }
 
+// MarshalJSON encodes CloneType as its string name.
+func (t CloneType) MarshalJSON() ([]byte, error) { return json.Marshal(t.String()) }
+
 // Finding represents a detected code clone. It groups one or more source regions
 // that share structural similarity above the detection threshold.
 //
@@ -45,36 +50,32 @@ func (t CloneType) String() string {
 // the same Finding with the same ID.
 type Finding struct {
 	// ID is the deterministic hash-based identifier for this finding.
-	ID FindingID
+	ID FindingID `json:"id"`
 
 	// CloneClassID groups all members of the same clone class together.
-	// Multiple findings may share a CloneClassID if they belong to the same
-	// transitively-connected group of similar code regions.
-	CloneClassID string
+	CloneClassID string `json:"clone_class_id"`
 
 	// Type is the classification of the clone relationship.
-	Type CloneType
+	Type CloneType `json:"type"`
 
 	// Regions lists all source code regions that form this clone class.
-	// There are always at least two regions in a clone finding.
-	Regions []SourceRegion
+	Regions []SourceRegion `json:"regions"`
 
 	// NormLevel is the normalization level at which the match was first detected.
-	NormLevel NormalizationLevel
+	NormLevel NormalizationLevel `json:"normalization_level"`
 
 	// Score contains the composite quality scores for this finding.
-	Score Score
+	Score Score `json:"score"`
 
 	// Evidence contains the detailed evidence that justifies this finding.
-	Evidence Evidence
+	Evidence Evidence `json:"evidence"`
 
 	// RefactorHints contains actionable refactoring suggestions for this clone.
-	RefactorHints []RefactorHint
+	RefactorHints []RefactorHint `json:"refactor_hints,omitempty"`
 
 	// Suppressed is true when this finding was filtered by noise-suppression rules.
-	// Suppressed findings are retained in the output when show_suppressed is enabled.
-	Suppressed bool
+	Suppressed bool `json:"suppressed"`
 
 	// SuppressReason explains why the finding was suppressed (if Suppressed is true).
-	SuppressReason string
+	SuppressReason string `json:"suppress_reason,omitempty"`
 }

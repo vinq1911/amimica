@@ -52,7 +52,7 @@ install: ## Install amimica to GOPATH/bin
 # ─── Run ─────────────────────────────────────────────────────────
 .PHONY: run
 run: build ## Build and run (pass ARGS="scan ." to set args)
-	./$(BINARY) $(ARGS)
+	./$(BINARY) $(ARGS); exit_code=$$?; if [ $$exit_code -le 1 ]; then exit 0; else exit $$exit_code; fi
 
 .PHONY: version
 version: build ## Print version info
