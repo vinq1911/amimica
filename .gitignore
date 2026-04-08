@@ -1,0 +1,24 @@
+# Build artifacts
+bin/
+dist/
+
+# Coverage
+*.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Amimica cache
+.amimica/cache/
+
+# Debug profiles
+*.prof

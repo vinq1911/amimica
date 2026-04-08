@@ -25,10 +25,12 @@ import (
 	"github.com/user/amimica/internal/logging"
 )
 
-// version is the current build version. It can be overridden at link time via:
-//
-//	go build -ldflags "-X main.version=1.2.3" ./cmd/amimica
-var version = "0.1.0-dev"
+// Build-time variables injected via ldflags. See Makefile.
+var (
+	version   = "0.1.0-dev"
+	commit    = "unknown"
+	buildDate = "unknown"
+)
 
 func main() {
 	flag.Usage = func() {
@@ -55,7 +57,7 @@ func main() {
 
 	switch args[0] {
 	case "version":
-		fmt.Printf("amimica version %s\n", version)
+		fmt.Printf("amimica version %s (commit %s, built %s)\n", version, commit, buildDate)
 	case "scan", "report", "explain", "diff", "serve-mcp":
 		fmt.Fprintf(os.Stderr, "amimica: command %q not implemented\n", args[0])
 		os.Exit(1)
