@@ -19,14 +19,31 @@ When creating a new file in `internal/`:
 4. If the package needs types from other internal packages, import only from `internal/model/`
 5. Do not create interfaces unless there are 2+ implementations or testing requires substitution
 
-## Model types
+## Implemented packages
 
-All shared data types live in `internal/model/`. This package must have ZERO imports from other `internal/` packages.
+| Package | Status | Key types/functions |
+|---|---|---|
+| `model/` | Done | Finding, NormalizedUnit, Score, Evidence, NormToken, FindingID |
+| `config/` | Done | Config, Load(), ApplyEnv(), Validate(), Default() |
+| `logging/` | Done | Setup(level, format) → *slog.Logger |
+| `fsguard/` | Done | Guard, ValidatePath(), ValidateSymlink(), ValidateFileSize() |
+| `discovery/` | Done | Walk(roots, cfg, log) → []SourceFile |
+| `parser/` | Done | ParseFile(), ParseFiles() → []*ParsedFile |
+| `normalize/` | Done | Normalizer.NormalizeFunc(), NormalizeBlock(), NormalizeStmts() |
+| `extract/` | Done | Extract(parsedFile, cfg, level) → []NormalizedUnit |
+| `fingerprint/` | Done | ComputeShingles(), ComputeMinHash(), LSHIndex |
+| `match/` | Done | FindClones(units, cfg, log) → []CloneClass |
+| `score/` | Done | ScoreFindings(classes, units, files, cfg) → []Finding |
+| `report/` | Done | WriteText(), WriteJSON() |
+| `engine/` | Done | Analyze(roots, cfg, log) → *Result |
+| `app/` | Done | RunScan(args) → exit code |
+| `explain/` | Planned | Finding explanation and diff generation |
+| `cache/` | Planned | Content-hash incremental cache |
+| `mcp/` | Planned | MCP server and tool handlers |
 
-When adding a new model type:
-- Put it in a file named after the primary type (e.g., `finding.go` for `Finding`)
-- Add a `String()` method for any `iota` type
-- Use `[N]byte` for fixed-size hashes, not `[]byte`
+## Model types — JSON tags required
+
+All model types that appear in output MUST have json tags. Enum types (CloneType, NormalizationLevel, RefactorCategory) MUST have MarshalJSON methods that serialize to strings.
 
 ## Error handling
 
@@ -38,55 +55,47 @@ return fmt.Errorf("normalize function %s: %w", fn.Name, err)
 return err
 ```
 
-## Testing patterns
-
-```go
-// Table-driven tests
-func TestNormalize(t *testing.T) {
-    tests := []struct {
-        name  string
-        input string
-        want  string
-    }{
-        {name: "empty", input: "", want: ""},
-        // ...
-    }
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            got := normalize(tt.input)
-            if got != tt.want {
-                t.Errorf("got %q, want %q", got, tt.want)
-            }
-        })
-    }
-}
-```
-
 ## Logging
 
 Use `slog` via the logger from `internal/logging`:
 ```go
-slog.Debug("parsing file", "path", path, "size", size)
-slog.Warn("skipping file", "path", path, "reason", "exceeds max size")
+log.Debug("parsing file", "path", path, "size", size)
+log.Warn("skipping file", "path", path, "reason", "exceeds max size")
 ```
 
-Never use `fmt.Println` or `log.Println` for operational output.
+Never use `fmt.Println` or `log.Println` for operational output. Logs go to stderr; results go to stdout.
 
 ## Normalization levels
 
-When working on normalization code:
-- `NormRaw` (0): Strip comments and whitespace only
-- `NormLight` (1): Replace literals with `$STR`, `$INT`, `$FLOAT`, `$RUNE`
-- `NormStrong` (2): Replace local identifiers with positional `$V0`, `$P0`, `$R`
-- `NormSemantic` (3): Abstract selectors, type names, channels
+| Level | Transforms | Identifiers | Literals | Function names |
+|---|---|---|---|---|
+| `NormRaw` (0) | Strip comments/whitespace | Keep | Keep | Keep |
+| `NormLight` (1) | + Replace literals | Keep | `$STR`, `$INT`, `$FLOAT`, `$RUNE` | Keep |
+| `NormStrong` (2) | + Replace identifiers | `$V0`, `$P0`, `$R` | Placeholders | `$FUNC` |
+| `NormSemantic` (3) | + Abstract selectors/types | Placeholders | Placeholders | `$FUNC` |
 
-Each level includes all transformations from lower levels.
+At NormStrong: function names → `$FUNC`, local vars → `$V0`/`$V1`, params → `$P0`/`$P1`, receivers → `$R`. Selector method names are preserved (e.g., `.Find()` stays `.Find()`).
 
 ## Pipeline order
 
-Components run in this order — respect the data flow:
 ```
 Discovery → Parser → Normalizer → Extractor → Fingerprinter → Matcher → Scorer → Reporter
 ```
 
 The `engine` package orchestrates this. Individual packages should not reach across the pipeline.
+
+## Matching layers (cheapest first)
+
+1. **Exact hash**: SHA-256 of normalized tokens. Groups by hash. O(n).
+2. **Shingles**: 7-token n-grams per unit.
+3. **MinHash**: 128-function signatures for approximate Jaccard estimation.
+4. **LSH**: 16-band locality-sensitive hashing index. Finds candidate pairs.
+5. **Jaccard verification**: Exact Jaccard on shingle sets. Threshold ≥ 0.6.
+6. **Union-find**: Clusters verified pairs into clone classes.
+
+Important: Skip pairs from the same function (overlapping windows aren't clones).
+
+## Scoring
+
+Composite = weighted(confidence, similarity, impact, refactorability, repetition) × penalties.
+Penalties: test code 0.5x, generated 0.3x, small regions 0.7x, 2-member classes 0.9x.

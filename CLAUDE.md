@@ -6,7 +6,7 @@ Amimica is a production-grade Go code clone detection CLI tool and MCP server. I
 
 ## Tech stack
 
-- **Language**: Go (1.25+, targeting 1.26 features when available)
+- **Language**: Go (1.25+)
 - **Dependencies**: Standard library first. Only third-party dep is `gopkg.in/yaml.v3` for config.
 - **Build**: `make build` (see `make help` for all targets)
 - **Test**: `make test` (race-enabled)
@@ -17,88 +17,98 @@ Amimica is a production-grade Go code clone detection CLI tool and MCP server. I
 ```
 cmd/amimica/           CLI entrypoint (flag-based subcommands, no cobra)
 internal/
-  model/               Shared data types (dependency-free, no imports from other internal/)
+  model/               Shared data types — dependency-free, imports nothing from internal/
   config/              YAML config loading, env overrides, validation
   logging/             Thin slog wrapper
   fsguard/             Path sandboxing, symlink policy, file size limits
-  discovery/           File walking, filtering, go.mod awareness
-  parser/              Go AST parsing with error tolerance
+  discovery/           File walking, filtering, generated/test file detection
+  parser/              Go AST parsing with error tolerance (partial ASTs)
   normalize/           AST normalization at 4 levels (raw/light/strong/semantic)
-  extract/             Unit extraction (functions, blocks, windows, subtrees)
-  fingerprint/         Hashing, shingles, MinHash, LSH
-  match/               Candidate generation, exact/approximate matching
-  score/               Scoring model, ranking, noise filtering
-  engine/              Pipeline orchestration — the main Analyze() entrypoint
-  explain/             Finding explanation and diff generation
-  report/              Output formatting (text, JSON, SARIF, markdown)
-  cache/               Content-hash cache, invalidation
-  mcp/                 MCP server, tool handlers, session state
-  app/                 CLI command implementations
+  extract/             Unit extraction: functions + sliding statement windows
+  fingerprint/         SHA-256 hashing, token shingles, MinHash, LSH index
+  match/               Exact hash grouping + approximate LSH matching + union-find clustering
+  score/               Weighted composite scoring, penalties, noise suppression, refactor hints
+  engine/              Pipeline orchestration — Analyze() is the single entrypoint
+  report/              Output formatting (text, JSON; SARIF and markdown planned)
+  explain/             Finding explanation and diff generation (planned)
+  cache/               Content-hash cache for incremental scans (planned)
+  mcp/                 MCP server, tool handlers, session state (planned)
+  app/                 CLI command implementations (scan is working)
 testdata/
   fixtures/            Purpose-built Go code exercising clone patterns
-  golden/              Expected outputs for golden tests
-  regressions/         Known FP/FN regression cases
+  golden/              Expected outputs for golden tests (planned)
+  regressions/         Known FP/FN regression cases (planned)
 ```
 
-## Architecture principles
+## Architecture
 
-- **model/ is dependency-free**: It imports nothing from other internal/ packages. All shared types live here.
-- **engine/ orchestrates**: Both CLI (`app/`) and MCP (`mcp/`) call `engine.Analyze()`. No business logic in CLI or MCP layers.
-- **Interfaces only where needed**: Concrete types preferred. Interfaces only for `discovery.Walker`, `cache.Store`, `report.Formatter`.
-- **No premature abstraction**: Don't add layers until there's a second consumer.
-- **Deterministic**: Same input + same config = same output. No randomness. Findings have stable IDs.
+```
+Discovery → Parser → Normalizer → Extractor → Fingerprinter → Matcher → Scorer → Reporter
+```
+
+- **model/ is dependency-free**: Imports nothing from other internal/ packages.
+- **engine/ orchestrates**: Both CLI (`app/`) and MCP (`mcp/`) call `engine.Analyze()`.
+- **Thin CLI/MCP layers**: No business logic in `cmd/`, `app/`, or `mcp/`.
+- **Deterministic**: Same input + same config = same output. Findings have stable IDs.
+
+## Normalization levels
+
+The core of the clone detection engine. Each level includes all transformations from lower levels.
+
+| Level | What it normalizes | Example |
+|---|---|---|
+| **Raw** (0) | Comments, whitespace | `x := 42` → `x := 42` |
+| **Light** (1) | + Literals | `x := 42` → `x := $INT` |
+| **Strong** (2) | + Identifiers (positional) | `x := 42` → `$V0 := $INT` |
+| **Semantic** (3) | + Selectors, types | `s.repo.Find()` → `$SEL.Find()` |
+
+At NormStrong, function names become `$FUNC`, local vars become `$V0`/`$V1`, params become `$P0`/`$P1`, receivers become `$R`.
+
+## Matching layers
+
+Cheapest first, progressively more expensive:
+
+1. **Exact hash**: Group units by SHA-256 of normalized tokens. O(n).
+2. **Token shingles**: 7-token n-gram hashes per unit.
+3. **MinHash + LSH**: 128-function MinHash signatures, 16-band LSH index. Finds approximate matches.
+4. **Jaccard verification**: Exact Jaccard similarity for LSH candidate pairs. Threshold: 0.6.
+5. **Union-find clustering**: Groups verified pairs into clone classes.
+
+## Scoring
+
+Composite score = weighted sum of confidence, similarity, impact, refactorability, repetition. Multiplicative penalties for test code (0.5x), generated code (0.3x), small regions (0.7x). Noise suppression below min_score threshold.
 
 ## Code style
 
-- Use `slog` for structured logging (via `internal/logging`). No `log.Println`.
-- Wrap errors with `fmt.Errorf("context: %w", err)`. Always add context.
-- Use `context.Context` for cancellation where appropriate.
+- Use `slog` for structured logging. No `log.Println` or `fmt.Println` for operational output.
+- Wrap errors: `fmt.Errorf("context: %w", err)`. Always add context.
 - No `panic` in library code. Return errors.
-- Small files. One primary type per file. Tests in `_test.go` alongside the code.
-- Table-driven tests preferred. Use `testdata/` for fixtures.
-- Document exported types with Go doc comments.
+- Small files. One primary type per file.
+- Table-driven tests. Use `testdata/` for fixtures.
+- JSON tags on all model types that appear in output.
+- `MarshalJSON` on enum types to serialize as strings.
 
 ## Common commands
 
 ```bash
-make help          # Show all available targets
-make build         # Build binary to bin/amimica
-make test          # Run tests with race detection
-make test-v        # Verbose test output
-make test-cover    # Coverage report
-make vet           # Go vet
-make lint          # golangci-lint (install: https://golangci-lint.run)
-make fmt           # Format code
-make check         # fmt + vet + test
-make doctor        # Check dev environment
-make run ARGS="version"   # Build and run with args
-make tidy          # go mod tidy + verify
-make clean         # Remove build artifacts
+make help                    # Show all targets
+make build                   # Build to bin/amimica
+make run ARGS="scan ."       # Build and scan
+make run ARGS="scan --output json ."  # JSON output
+make test                    # Tests with race detection
+make test-cover              # Coverage report
+make check                   # fmt + vet + test
+make doctor                  # Check environment
+make tidy                    # go mod tidy + verify
 ```
-
-## Testing approach
-
-- Unit tests: Every package gets `_test.go`. 80% line coverage target.
-- Golden tests: `testdata/golden/` — run pipeline on fixtures, compare to expected JSON.
-- Fixture repos: `testdata/fixtures/` — purpose-built Go code for clone scenarios.
-- Benchmarks: `_test.go` with `Benchmark*` functions for hot paths.
-- Run with `-race` always.
-
-## Key design decisions
-
-1. **Syntax-only analysis (no go/types in v1)**: Faster, works on non-building code, catches Type-1/2/3 clones.
-2. **stdlib `flag` for CLI**: No cobra dependency. Subcommand dispatch is manual.
-3. **Four normalization levels**: NormRaw → NormLight → NormStrong → NormSemantic. Each progressively abstracts more.
-4. **Layered matching**: Exact hash → token shingles → MinHash/LSH → structural distance. Cheapest first.
-5. **Scoring model**: Weighted composite of confidence, similarity, impact, refactorability. Configurable.
 
 ## What NOT to do
 
-- Don't add new third-party dependencies without strong justification.
-- Don't put business logic in `cmd/`, `internal/app/`, or `internal/mcp/`. Those are thin wiring layers.
-- Don't use `interface{}` or `any` for typed data. Use the model types.
+- Don't add third-party deps without strong justification.
+- Don't put analysis logic in `cmd/`, `app/`, or `mcp/`. Those are thin wiring.
+- Don't use `interface{}` or `any` for typed data. Use model types.
 - Don't skip tests. Every new function gets a test.
-- Don't use `go generate` for anything critical-path.
+- Don't forget json tags on model types.
 
 ## Reference
 
