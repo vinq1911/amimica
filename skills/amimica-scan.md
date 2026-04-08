@@ -78,28 +78,36 @@ View two code regions side by side.
 4. `compare_regions` to see the actual code side by side
 5. Suggest refactoring based on the clone type and hints
 
-## Interpreting results
+## Reading MCP output
 
-**Scores** (0.0-1.0):
+MCP tools return compact output to save tokens. Decode with these legends:
 
-| Range | Meaning |
-|-------|---------|
-| > 0.8 | High confidence — almost certainly actionable |
-| 0.5-0.8 | Medium — likely real, worth reviewing |
-| 0.15-0.5 | Low — possible clone, may be intentional |
+**Scores** (0.0-1.0): >0.8 high | 0.5-0.8 medium | <0.5 low
 
-**Clone types**:
+**Clone type codes**:
 
-| Type | Meaning |
+| Code | Meaning |
 |------|---------|
-| `renamed` | Identical structure, different names. Exact match after normalization. |
-| `near_duplicate` | Very similar with small differences. |
-| `exact` | Identical code (whitespace/comment differences only). |
+| `EX` | Exact — identical code |
+| `RN` | Renamed — identical structure, different identifiers |
+| `ND` | Near-duplicate — similar with small differences |
+| `PT` | Pattern — recurring structural pattern |
 
-**Refactor hints**:
-- `extract_helper` — pull shared logic into a function
-- `table_driven` — replace repeated blocks with a data-driven approach
-- `interface_extract` — unify similar implementations behind an interface
+**Refactor hint codes** (after `→`):
+
+| Code | Meaning |
+|------|---------|
+| `EH` | Extract helper function |
+| `TD` | Table-driven refactor |
+| `IE` | Interface extraction |
+| `GF` | Generic function |
+| `SV` | Shared validator |
+| `AM` | Adapter/mapper |
+| `CD` | Config-driven |
+
+**Example**: `#1 0.77 ND 2r →EH` = finding #1, score 0.77, near-duplicate, 2 regions, suggest extract-helper.
+
+**Explain output**: `conf=` confidence, `sim=` similarity, `imp=` impact, `ref=` refactorability. Normalized form is truncated; pass `verbose:true` for full.
 
 ## Suppressing findings
 
