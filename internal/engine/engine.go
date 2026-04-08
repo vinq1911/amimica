@@ -116,14 +116,15 @@ func AnalyzeWith(roots []string, cfg *config.Config, registry *lang.Registry, lo
 	log.Info("findings scored", "total", len(findings))
 
 	result := &report.Result{
-		Version:       "0.1.0-dev",
-		ScanRoot:      roots[0],
-		Timestamp:     time.Now(),
-		FilesScanned:  len(files),
-		FuncsAnalyzed: funcCount,
-		UnitsAnalyzed: len(allUnits),
-		Duration:      time.Since(start),
-		Findings:      findings,
+		Version:           "0.1.0-dev",
+		ScanRoot:          roots[0],
+		Timestamp:         time.Now(),
+		FilesScanned:      len(files),
+		FuncsAnalyzed:     funcCount,
+		UnitsAnalyzed:     len(allUnits),
+		CloneClassesTotal: len(classes),
+		Duration:          time.Since(start),
+		Findings:          findings,
 	}
 
 	return result, nil

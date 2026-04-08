@@ -14,14 +14,15 @@ import (
 
 // Result holds the complete analysis output.
 type Result struct {
-	Version       string          `json:"version"`
-	ScanRoot      string          `json:"scan_root"`
-	Timestamp     time.Time       `json:"timestamp"`
-	FilesScanned  int             `json:"files_scanned"`
-	FuncsAnalyzed int             `json:"functions_analyzed"`
-	UnitsAnalyzed int             `json:"units_analyzed"`
-	Duration      time.Duration   `json:"duration_ms"`
-	Findings      []model.Finding `json:"findings"`
+	Version          string          `json:"version"`
+	ScanRoot         string          `json:"scan_root"`
+	Timestamp        time.Time       `json:"timestamp"`
+	FilesScanned     int             `json:"files_scanned"`
+	FuncsAnalyzed    int             `json:"functions_analyzed"`
+	UnitsAnalyzed    int             `json:"units_analyzed"`
+	CloneClassesTotal int           `json:"clone_classes_total"`
+	Duration         time.Duration   `json:"duration_ms"`
+	Findings         []model.Finding `json:"findings"`
 }
 
 // WriteText writes a human-readable text report to w.
@@ -45,7 +46,11 @@ func WriteText(w io.Writer, r *Result) error {
 		return nil
 	}
 
-	fmt.Fprintf(w, "Found %d clone classes\n\n", len(visible))
+	if r.CloneClassesTotal > len(visible) {
+		fmt.Fprintf(w, "Found %d clone classes (showing top %d)\n\n", r.CloneClassesTotal, len(visible))
+	} else {
+		fmt.Fprintf(w, "Found %d clone classes\n\n", len(visible))
+	}
 
 	for i, f := range visible {
 		typeStr := f.Type.String()

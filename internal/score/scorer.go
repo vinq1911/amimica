@@ -204,9 +204,13 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 	})
 
 	// Deduplicate: suppress window findings whose regions are subsets of a
-	// higher-scoring function finding's regions. A window region is "contained"
-	// if it shares the same file and its line range falls within the function's range.
+	// higher-scoring function finding's regions.
 	findings = deduplicateSubsumedWindows(findings)
+
+	// Merge overlapping window findings that match the same file pairs.
+	// e.g., fileA:42-47↔fileB:75-80 and fileA:43-48↔fileB:76-81 become
+	// one finding spanning fileA:42-48↔fileB:75-81.
+	findings = mergeOverlappingFindings(findings)
 
 	// Cap at max findings (only count non-suppressed).
 	if cfg.Scoring.MaxFindings > 0 {
@@ -274,6 +278,88 @@ func deduplicateSubsumedWindows(findings []model.Finding) []model.Finding {
 			f.Suppressed = true
 			f.SuppressReason = "window subsumed by function-level finding"
 		}
+	}
+
+	return findings
+}
+
+// mergeOverlappingFindings consolidates window-level findings that share the
+// same set of (file, funcName) pairs with overlapping line ranges into a single
+// finding spanning the combined range. This turns three findings like:
+//
+//	fileA:42-47 ↔ fileB:75-80
+//	fileA:43-48 ↔ fileB:76-81
+//	fileA:45-50 ↔ fileB:78-83
+//
+// into one finding: fileA:42-50 ↔ fileB:75-83, keeping the highest score.
+func mergeOverlappingFindings(findings []model.Finding) []model.Finding {
+	// Build a fingerprint for each finding based on its set of (file, funcName) pairs.
+	// Findings with the same fingerprint are candidates for merging.
+	type fileFuncKey struct {
+		file     string
+		funcName string
+	}
+
+	// Group findings by their file-function pair signature.
+	type groupKey string
+	groups := make(map[groupKey][]int) // groupKey → finding indices
+
+	for i, f := range findings {
+		if f.Suppressed || f.UnitKind != model.UnitWindow {
+			continue
+		}
+		// Build a canonical key from sorted (file, funcName) pairs.
+		keys := make([]fileFuncKey, len(f.Regions))
+		for j, r := range f.Regions {
+			keys[j] = fileFuncKey{file: r.File, funcName: r.FuncName}
+		}
+		sort.Slice(keys, func(a, b int) bool {
+			if keys[a].file != keys[b].file {
+				return keys[a].file < keys[b].file
+			}
+			return keys[a].funcName < keys[b].funcName
+		})
+		var buf string
+		for _, k := range keys {
+			buf += k.file + ":" + k.funcName + "|"
+		}
+		groups[groupKey(buf)] = append(groups[groupKey(buf)], i)
+	}
+
+	// For each group with multiple findings, merge overlapping ones.
+	for _, idxs := range groups {
+		if len(idxs) < 2 {
+			continue
+		}
+
+		// Keep the highest-scoring finding, expand its regions, suppress the rest.
+		// idxs[0] has the highest score (findings are sorted by score descending).
+		best := idxs[0]
+
+		for _, other := range idxs[1:] {
+			// Expand the best finding's regions to cover the other's ranges.
+			for j := range findings[best].Regions {
+				for _, otherRegion := range findings[other].Regions {
+					if findings[best].Regions[j].File == otherRegion.File &&
+						findings[best].Regions[j].FuncName == otherRegion.FuncName {
+						if otherRegion.StartLine < findings[best].Regions[j].StartLine {
+							findings[best].Regions[j].StartLine = otherRegion.StartLine
+						}
+						if otherRegion.EndLine > findings[best].Regions[j].EndLine {
+							findings[best].Regions[j].EndLine = otherRegion.EndLine
+						}
+						break
+					}
+				}
+			}
+
+			// Suppress the merged finding.
+			findings[other].Suppressed = true
+			findings[other].SuppressReason = "merged into overlapping finding"
+		}
+
+		// Recalculate the finding ID since regions changed.
+		findings[best].ID = computeFindingID(findings[best].Regions, findings[best].Type, findings[best].NormLevel)
 	}
 
 	return findings
