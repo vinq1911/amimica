@@ -84,7 +84,7 @@ type ScoringConfig struct {
 	// Range: 0.0-1.0. Default: 0.15.
 	MinScore float64 `yaml:"min_score"`
 
-	// MaxFindings caps the total number of findings returned. Default: 100.
+	// MaxFindings caps the total number of findings returned. 0 = no limit. Default: 0.
 	MaxFindings int `yaml:"max_findings"`
 
 	// Weights controls the relative importance of each scoring dimension.
@@ -210,7 +210,7 @@ func Default() *Config {
 		},
 		Scoring: ScoringConfig{
 			MinScore:    0.15,
-			MaxFindings: 100,
+			MaxFindings: 0, // 0 = no limit
 			Weights: ScoringWeights{
 				Similarity:      0.30,
 				Impact:          0.25,

@@ -58,8 +58,8 @@ func Validate(cfg *Config) error {
 	if cfg.Scoring.MinScore < 0.0 || cfg.Scoring.MinScore > 1.0 {
 		errs = append(errs, fmt.Errorf("scoring.min_score must be in [0.0, 1.0], got %f", cfg.Scoring.MinScore))
 	}
-	if cfg.Scoring.MaxFindings < 1 {
-		errs = append(errs, fmt.Errorf("scoring.max_findings must be >= 1, got %d", cfg.Scoring.MaxFindings))
+	if cfg.Scoring.MaxFindings < 0 {
+		errs = append(errs, fmt.Errorf("scoring.max_findings must be >= 0 (0 = no limit), got %d", cfg.Scoring.MaxFindings))
 	}
 
 	// Validate scoring weights individually

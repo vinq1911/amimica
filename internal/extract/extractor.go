@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"go/ast"
 	"go/token"
+	"strings"
 
 	"github.com/user/amimica/internal/config"
 	"github.com/user/amimica/internal/model"
@@ -17,6 +18,7 @@ import (
 
 // Extract produces NormalizedUnits from a parsed file at the given normalization level.
 // It extracts function-level units and optionally statement windows.
+// Functions annotated with "amimica-ignore" in their doc comment are skipped.
 func Extract(pf *parser.ParsedFile, cfg *config.Config, level model.NormalizationLevel) []model.NormalizedUnit {
 	norm := normalize.New(level, pf.Fset)
 	var units []model.NormalizedUnit
@@ -24,6 +26,11 @@ func Extract(pf *parser.ParsedFile, cfg *config.Config, level model.Normalizatio
 	for _, decl := range pf.File.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
 		if !ok || fn.Body == nil {
+			continue
+		}
+
+		// Check for amimica-ignore directive in doc comment or line comment.
+		if hasIgnoreDirective(fn) {
 			continue
 		}
 
@@ -64,6 +71,19 @@ func Extract(pf *parser.ParsedFile, cfg *config.Config, level model.Normalizatio
 	}
 
 	return units
+}
+
+// hasIgnoreDirective checks whether a function declaration has an "amimica-ignore"
+// directive in its doc comment or associated comment group.
+func hasIgnoreDirective(fn *ast.FuncDecl) bool {
+	if fn.Doc != nil {
+		for _, c := range fn.Doc.List {
+			if strings.Contains(c.Text, "amimica-ignore") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func makeUnit(tokens []model.NormToken, region model.SourceRegion, kind model.UnitKind, level model.NormalizationLevel, stmtCount, nodeCount int) model.NormalizedUnit {

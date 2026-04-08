@@ -32,8 +32,8 @@ func TestDefaultReturnsPopulatedConfig(t *testing.T) {
 	if cfg.Scoring.MinScore != 0.15 {
 		t.Errorf("MinScore: got %f, want 0.15", cfg.Scoring.MinScore)
 	}
-	if cfg.Scoring.MaxFindings != 100 {
-		t.Errorf("MaxFindings: got %d, want 100", cfg.Scoring.MaxFindings)
+	if cfg.Scoring.MaxFindings != 0 {
+		t.Errorf("MaxFindings: got %d, want 0 (no limit)", cfg.Scoring.MaxFindings)
 	}
 
 	// Version

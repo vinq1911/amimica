@@ -27,7 +27,7 @@ func RunScan(args []string) int {
 	normLevel := fs.String("norm-level", "", "Normalization level: raw, light, strong, semantic")
 	excludeTests := fs.Bool("exclude-tests", false, "Exclude test files entirely")
 	thorough := fs.Bool("thorough", false, "Enable thorough scanning")
-	maxFindings := fs.Int("max-findings", -1, "Maximum findings to report")
+	maxFindings := fs.Int("n", 0, "Limit output to N findings (0 = no limit)")
 	debug := fs.Bool("debug", false, "Enable debug logging")
 	noCache := fs.Bool("no-cache", false, "Disable caching")
 
@@ -69,7 +69,7 @@ func RunScan(args []string) int {
 	if *thorough {
 		cfg.Analysis.Thorough = true
 	}
-	if *maxFindings >= 0 {
+	if *maxFindings > 0 {
 		cfg.Scoring.MaxFindings = *maxFindings
 	}
 	if *noCache {

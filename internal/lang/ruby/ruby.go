@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/user/amimica/internal/config"
+	"github.com/user/amimica/internal/lang"
 	"github.com/user/amimica/internal/model"
 )
 
@@ -57,6 +58,11 @@ func (l *Lang) ParseAndExtract(sf model.SourceFile, cfg *config.Config, level mo
 	var units []model.NormalizedUnit
 
 	for _, m := range methods {
+		// Check for amimica-ignore directive.
+		if lang.HasIgnoreComment(content, m.startLine) {
+			continue
+		}
+
 		normBody := normalizeTokens(m.bodyTokens, level)
 		stmtCount := estimateStatements(normBody)
 		if stmtCount < cfg.Analysis.MinStatements {

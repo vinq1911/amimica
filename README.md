@@ -95,9 +95,9 @@ Flags:
   --min-lines <int>       Minimum lines per region (default: 6)
   --min-statements <int>  Minimum statements per unit (default: 3)
   --norm-level <level>    Normalization: raw, light, strong, semantic (default: strong)
+  -n <int>                Limit output to N findings (0 = no limit, default: 0)
   --exclude-tests         Exclude test files entirely
   --thorough              Enable deeper analysis (slower)
-  --max-findings <int>    Maximum findings (default: 100)
   --no-cache              Disable caching
   --debug                 Enable debug logging
 
@@ -107,6 +107,27 @@ Exit codes:
   2  Configuration error
   3  Analysis error
 ```
+
+## Ignoring findings
+
+Add an `amimica-ignore` comment above any function to exclude it from analysis:
+
+```go
+// amimica-ignore: intentionally duplicated for performance
+func handleSpecialCase(ctx context.Context) error {
+```
+
+```typescript
+// amimica-ignore
+function legacyHandler(req: Request) {
+```
+
+```ruby
+# amimica-ignore
+def process(document)
+```
+
+Works with all supported languages. The comment must appear on the line directly above the function definition (or up to 2 lines above).
 
 ## Configuration
 
