@@ -135,6 +135,34 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 			composite *= p.Factor
 		}
 
+		// Penalize findings with very few tokens — they match on generic
+		// structural skeletons (JSX closing tags, short assignments) rather
+		// than meaningful logic.
+		avgTokens := totalTokens / len(regions)
+		if avgTokens < 25 {
+			p := model.Penalty{Reason: "low token count", Factor: 0.6}
+			penalties = append(penalties, p)
+			composite *= p.Factor
+		}
+
+		// Penalize window-level findings where all regions are in the same
+		// file and function — these are internal repetition within a single
+		// component, usually intentional (JSX variant lists, switch cases).
+		if dominantKind == model.UnitWindow && len(regions) >= 2 {
+			sameFileFn := true
+			for i := 1; i < len(regions); i++ {
+				if regions[i].File != regions[0].File || regions[i].FuncName != regions[0].FuncName {
+					sameFileFn = false
+					break
+				}
+			}
+			if sameFileFn {
+				p := model.Penalty{Reason: "same-function window repetition", Factor: 0.5}
+				penalties = append(penalties, p)
+				composite *= p.Factor
+			}
+		}
+
 		fid := computeFindingID(regions, class.Type, class.NormLevel)
 
 		finding := model.Finding{
