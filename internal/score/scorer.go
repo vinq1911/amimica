@@ -14,7 +14,8 @@ import (
 	"github.com/user/amimica/internal/model"
 )
 
-// ScoreFindings converts clone classes into scored findings.
+// ScoreFindings converts clone classes into scored findings, then deduplicates
+// window findings that are contained within a higher-scoring function finding.
 func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, files []model.SourceFile, cfg *config.Config) []model.Finding {
 	fileMap := make(map[string]*model.SourceFile)
 	for i := range files {
@@ -28,6 +29,21 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 			continue
 		}
 
+		// Determine the dominant unit kind in this class.
+		funcCount, winCount := 0, 0
+		for _, idx := range class.UnitIdxs {
+			switch units[idx].Kind {
+			case model.UnitFunction:
+				funcCount++
+			case model.UnitWindow:
+				winCount++
+			}
+		}
+		dominantKind := model.UnitWindow
+		if funcCount >= winCount {
+			dominantKind = model.UnitFunction
+		}
+
 		// Build regions and evidence.
 		var regions []model.SourceRegion
 		totalTokens := 0
@@ -36,7 +52,6 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 		for _, idx := range class.UnitIdxs {
 			u := &units[idx]
 			r := u.Source
-			// Enrich region with package name from file metadata.
 			if sf := fileMap[r.File]; sf != nil {
 				r.Package = sf.Package
 			}
@@ -45,7 +60,6 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 			totalLines += u.Source.EndLine - u.Source.StartLine + 1
 		}
 
-		// Normalized form from first unit (they're all similar).
 		normForm := extract.TokensToString(units[class.UnitIdxs[0]].NormTokens)
 
 		// Calculate scores.
@@ -61,7 +75,14 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 			cfg.Scoring.Weights.Refactorability*refactorability +
 			cfg.Scoring.Weights.Repetition*repetition
 
-		// Cap composite to [0, 1].
+		// Function-level matches are more actionable than window fragments.
+		// Boost functions, penalize windows.
+		if dominantKind == model.UnitFunction {
+			composite *= 1.15 // 15% boost for full-function matches
+		} else if dominantKind == model.UnitWindow {
+			composite *= 0.85 // 15% penalty for window fragments
+		}
+
 		if composite > 1.0 {
 			composite = 1.0
 		}
@@ -114,7 +135,6 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 			composite *= p.Factor
 		}
 
-		// Build finding.
 		fid := computeFindingID(regions, class.Type, class.NormLevel)
 
 		finding := model.Finding{
@@ -138,17 +158,15 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 				SimilarityMetric: class.Metric,
 				SimilarityValue:  class.Similarity,
 			},
+			UnitKind: dominantKind,
 		}
 
-		// Noise suppression.
 		if composite < cfg.Scoring.MinScore {
 			finding.Suppressed = true
 			finding.SuppressReason = fmt.Sprintf("score %.2f below threshold %.2f", composite, cfg.Scoring.MinScore)
 		}
 
-		// Refactor hints.
 		finding.RefactorHints = suggestRefactoring(class, units, regions)
-
 		findings = append(findings, finding)
 	}
 
@@ -157,9 +175,77 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 		return findings[i].Score.Composite > findings[j].Score.Composite
 	})
 
-	// Cap at max findings.
-	if cfg.Scoring.MaxFindings > 0 && len(findings) > cfg.Scoring.MaxFindings {
-		findings = findings[:cfg.Scoring.MaxFindings]
+	// Deduplicate: suppress window findings whose regions are subsets of a
+	// higher-scoring function finding's regions. A window region is "contained"
+	// if it shares the same file and its line range falls within the function's range.
+	findings = deduplicateSubsumedWindows(findings)
+
+	// Cap at max findings (only count non-suppressed).
+	if cfg.Scoring.MaxFindings > 0 {
+		visible := 0
+		for i := range findings {
+			if !findings[i].Suppressed {
+				visible++
+				if visible > cfg.Scoring.MaxFindings {
+					findings = findings[:i]
+					break
+				}
+			}
+		}
+	}
+
+	return findings
+}
+
+// deduplicateSubsumedWindows suppresses window-level findings whose regions
+// are all contained within regions of a higher-scoring function-level finding.
+// This ensures that e.g. a full AudioProcessor.process match outranks the
+// 5-line window fragments from the same function pair.
+func deduplicateSubsumedWindows(findings []model.Finding) []model.Finding {
+	// Build an index of function-level finding regions for fast lookup.
+	// Key: file path → list of (startLine, endLine) from function findings.
+	type lineRange struct {
+		start, end int
+	}
+	funcRegions := make(map[string][]lineRange)
+
+	for _, f := range findings {
+		if f.Suppressed || f.UnitKind != model.UnitFunction {
+			continue
+		}
+		for _, r := range f.Regions {
+			funcRegions[r.File] = append(funcRegions[r.File], lineRange{r.StartLine, r.EndLine})
+		}
+	}
+
+	for i := range findings {
+		f := &findings[i]
+		if f.Suppressed || f.UnitKind != model.UnitWindow {
+			continue
+		}
+
+		// Check if ALL regions of this window finding are contained within
+		// some function finding's regions.
+		allContained := true
+		for _, r := range f.Regions {
+			ranges := funcRegions[r.File]
+			contained := false
+			for _, fr := range ranges {
+				if r.StartLine >= fr.start && r.EndLine <= fr.end {
+					contained = true
+					break
+				}
+			}
+			if !contained {
+				allContained = false
+				break
+			}
+		}
+
+		if allContained {
+			f.Suppressed = true
+			f.SuppressReason = "window subsumed by function-level finding"
+		}
 	}
 
 	return findings
@@ -193,23 +279,19 @@ func impactScore(regions []model.SourceRegion, totalLines int) float64 {
 }
 
 func refactorabilityScore(regions []model.SourceRegion, class match.CloneClass) float64 {
-	score := 0.5 // base
+	score := 0.5
 
-	// Count distinct directories (proxy for packages).
 	dirSet := make(map[string]bool)
 	for _, r := range regions {
 		dirSet[filepath.Dir(r.File)] = true
 	}
 
 	if len(dirSet) == 1 {
-		// All in same directory/package — easiest to refactor.
 		score += 0.3
 	} else if len(dirSet) <= 3 {
-		// Few packages — still manageable.
 		score += 0.1
 	}
 
-	// Exact match is easier to refactor than near-duplicate.
 	if class.Similarity >= 1.0 {
 		score += 0.2
 	} else if class.Similarity >= 0.8 {
@@ -222,7 +304,6 @@ func refactorabilityScore(regions []model.SourceRegion, class match.CloneClass) 
 func suggestRefactoring(class match.CloneClass, units []model.NormalizedUnit, regions []model.SourceRegion) []model.RefactorHint {
 	var hints []model.RefactorHint
 
-	// Count distinct packages.
 	dirSet := make(map[string]bool)
 	for _, r := range regions {
 		dirSet[filepath.Dir(r.File)] = true

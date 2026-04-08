@@ -78,4 +78,8 @@ type Finding struct {
 
 	// SuppressReason explains why the finding was suppressed (if Suppressed is true).
 	SuppressReason string `json:"suppress_reason,omitempty"`
+
+	// UnitKind records the dominant unit kind (function vs window) for this finding.
+	// Used by the scorer for deduplication. Omitted from JSON output.
+	UnitKind UnitKind `json:"-"`
 }
