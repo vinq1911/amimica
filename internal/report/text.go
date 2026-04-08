@@ -61,20 +61,16 @@ func WriteText(w io.Writer, r *Result) error {
 			loc := fmt.Sprintf("  %s:%d-%d", r.File, r.StartLine, r.EndLine)
 			if r.FuncName != "" {
 				if r.Receiver != "" {
-					loc += fmt.Sprintf("  (%s.%s)", r.Receiver, r.FuncName)
+					loc += fmt.Sprintf(" (%s) %s", r.Receiver, r.FuncName)
 				} else {
-					loc += fmt.Sprintf("  (%s)", r.FuncName)
+					loc += fmt.Sprintf(" %s", r.FuncName)
 				}
 			}
 			fmt.Fprintf(w, "    %s\n", loc)
 		}
 
-		simPct := f.Score.Similarity * 100
-		if simPct > 100 {
-			simPct = 100
-		}
 		fmt.Fprintf(w, "     Similarity: %.0f%% (%s)\n",
-			simPct, f.Evidence.SimilarityMetric)
+			f.Score.Similarity*100, f.Evidence.SimilarityMetric)
 
 		if len(f.RefactorHints) > 0 {
 			fmt.Fprintf(w, "     Refactor: %s\n", f.RefactorHints[0].Description)

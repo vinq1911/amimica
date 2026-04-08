@@ -4,6 +4,7 @@ package match
 
 import (
 	"log/slog"
+	"path/filepath"
 
 	"github.com/user/amimica/internal/config"
 	"github.com/user/amimica/internal/fingerprint"
@@ -29,6 +30,9 @@ func FindClones(units []model.NormalizedUnit, cfg *config.Config, log *slog.Logg
 	matched := make(map[int]bool)
 
 	for _, group := range exactGroups {
+		// Remove overlapping regions from the same function before evaluating.
+		group = deduplicateOverlapping(group, units)
+
 		if len(group) < 2 {
 			continue
 		}
@@ -87,7 +91,6 @@ func FindClones(units []model.NormalizedUnit, cfg *config.Config, log *slog.Logg
 	}
 
 	// Query candidates and verify.
-	approxMatched := make(map[int]bool)
 	pairSeen := make(map[[2]int]bool)
 
 	type matchPair struct {
@@ -108,9 +111,8 @@ func FindClones(units []model.NormalizedUnit, cfg *config.Config, log *slog.Logg
 			}
 			pairSeen[pair] = true
 
-			// Skip pairs from the same function (overlapping windows are not interesting clones).
-			if units[idx].Source.File == units[cand].Source.File &&
-				units[idx].Source.FuncName == units[cand].Source.FuncName {
+			// Skip overlapping regions in the same file+function.
+			if regionsOverlap(units[idx].Source, units[cand].Source) {
 				continue
 			}
 
@@ -151,10 +153,16 @@ func FindClones(units []model.NormalizedUnit, cfg *config.Config, log *slog.Logg
 		}
 
 		for root, group := range groups {
+			// Deduplicate overlapping regions within the cluster.
+			group = deduplicateOverlapping(group, units)
+
 			if len(group) < 2 {
 				continue
 			}
 			avgSim := simSums[root] / float64(simCounts[root])
+			if avgSim > 1.0 {
+				avgSim = 1.0
+			}
 			classes = append(classes, CloneClass{
 				Type:       model.CloneNearDuplicate,
 				NormLevel:  units[group[0]].NormLevel,
@@ -162,15 +170,112 @@ func FindClones(units []model.NormalizedUnit, cfg *config.Config, log *slog.Logg
 				Similarity: avgSim,
 				Metric:     "minhash_lsh",
 			})
-			for _, idx := range group {
-				approxMatched[idx] = true
-			}
 		}
 	}
 
-	log.Debug("approximate matching done", "new_classes", len(classes)-len(exactGroups), "matched_units", len(approxMatched))
+	log.Debug("approximate matching done", "total_classes", len(classes))
 
 	return classes
+}
+
+// regionsOverlap returns true if two source regions share lines in the same file
+// and function. This catches overlapping sliding windows.
+func regionsOverlap(a, b model.SourceRegion) bool {
+	if a.File != b.File {
+		return false
+	}
+	if a.FuncName != b.FuncName {
+		return false
+	}
+	// Check if line ranges overlap.
+	return a.StartLine <= b.EndLine && b.StartLine <= a.EndLine
+}
+
+// deduplicateOverlapping removes overlapping regions from the same file+function
+// within a clone group. For a set of overlapping windows, keep only the one with
+// the most statements (or earliest start line as tiebreak).
+func deduplicateOverlapping(idxs []int, units []model.NormalizedUnit) []int {
+	if len(idxs) <= 1 {
+		return idxs
+	}
+
+	// Group by (file, funcName, dir) — "same location group".
+	type locKey struct {
+		file     string
+		funcName string
+		dir      string
+	}
+
+	groups := make(map[locKey][]int)
+	for _, idx := range idxs {
+		u := units[idx]
+		k := locKey{
+			file:     u.Source.File,
+			funcName: u.Source.FuncName,
+			dir:      filepath.Dir(u.Source.File),
+		}
+		groups[k] = append(groups[k], idx)
+	}
+
+	var result []int
+	for _, group := range groups {
+		if len(group) == 1 {
+			result = append(result, group[0])
+			continue
+		}
+
+		// Among overlapping units at the same location, pick representatives.
+		// Merge overlapping ranges and keep the best unit per merged range.
+		kept := pickNonOverlapping(group, units)
+		result = append(result, kept...)
+	}
+
+	return result
+}
+
+// pickNonOverlapping selects non-overlapping units from a set that all share
+// the same file and function. For each cluster of overlapping units, it picks
+// the one with the widest span (most lines).
+func pickNonOverlapping(idxs []int, units []model.NormalizedUnit) []int {
+	if len(idxs) <= 1 {
+		return idxs
+	}
+
+	type entry struct {
+		idx   int
+		start int
+		end   int
+	}
+
+	entries := make([]entry, len(idxs))
+	for i, idx := range idxs {
+		entries[i] = entry{idx: idx, start: units[idx].Source.StartLine, end: units[idx].Source.EndLine}
+	}
+
+	// Sort by start line.
+	for i := 1; i < len(entries); i++ {
+		for j := i; j > 0 && entries[j].start < entries[j-1].start; j-- {
+			entries[j], entries[j-1] = entries[j-1], entries[j]
+		}
+	}
+
+	// Greedily merge overlapping entries, keeping the widest.
+	var result []int
+	cur := entries[0]
+	for i := 1; i < len(entries); i++ {
+		if entries[i].start <= cur.end {
+			// Overlaps — keep the wider one.
+			if (entries[i].end - entries[i].start) > (cur.end - cur.start) {
+				cur = entries[i]
+			}
+		} else {
+			// No overlap — emit current, start new.
+			result = append(result, cur.idx)
+			cur = entries[i]
+		}
+	}
+	result = append(result, cur.idx)
+	return result
 }
 
 func groupByHash(units []model.NormalizedUnit) map[[32]byte][]int {

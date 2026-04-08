@@ -44,6 +44,7 @@ type SourceRegion struct {
 	EndCol    int    `json:"end_col,omitempty"`
 	FuncName  string `json:"func_name,omitempty"`
 	Receiver  string `json:"receiver,omitempty"`
+	Package   string `json:"package,omitempty"`
 }
 
 // ParseError records a single non-fatal parse error encountered in a source file.

@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"math"
+	"path/filepath"
 	"sort"
 
 	"github.com/user/amimica/internal/config"
@@ -34,7 +35,12 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 
 		for _, idx := range class.UnitIdxs {
 			u := &units[idx]
-			regions = append(regions, u.Source)
+			r := u.Source
+			// Enrich region with package name from file metadata.
+			if sf := fileMap[r.File]; sf != nil {
+				r.Package = sf.Package
+			}
+			regions = append(regions, r)
 			totalTokens += len(u.NormTokens)
 			totalLines += u.Source.EndLine - u.Source.StartLine + 1
 		}
@@ -54,6 +60,11 @@ func ScoreFindings(classes []match.CloneClass, units []model.NormalizedUnit, fil
 			cfg.Scoring.Weights.Impact*impact +
 			cfg.Scoring.Weights.Refactorability*refactorability +
 			cfg.Scoring.Weights.Repetition*repetition
+
+		// Cap composite to [0, 1].
+		if composite > 1.0 {
+			composite = 1.0
+		}
 
 		// Apply penalties.
 		var penalties []model.Penalty
@@ -176,7 +187,6 @@ func confidenceScore(class match.CloneClass) float64 {
 }
 
 func impactScore(regions []model.SourceRegion, totalLines int) float64 {
-	// More regions and more lines = higher impact.
 	regionFactor := math.Min(1.0, float64(len(regions))/5.0)
 	lineFactor := math.Min(1.0, float64(totalLines)/200.0)
 	return (regionFactor + lineFactor) / 2.0
@@ -185,19 +195,25 @@ func impactScore(regions []model.SourceRegion, totalLines int) float64 {
 func refactorabilityScore(regions []model.SourceRegion, class match.CloneClass) float64 {
 	score := 0.5 // base
 
-	// Same package?
-	pkgSet := make(map[string]bool)
+	// Count distinct directories (proxy for packages).
+	dirSet := make(map[string]bool)
 	for _, r := range regions {
-		// Extract package from file path (heuristic: directory name).
-		pkgSet[r.File] = true
-	}
-	if len(pkgSet) <= 3 {
-		score += 0.2
+		dirSet[filepath.Dir(r.File)] = true
 	}
 
-	// Exact match (easy to refactor).
+	if len(dirSet) == 1 {
+		// All in same directory/package — easiest to refactor.
+		score += 0.3
+	} else if len(dirSet) <= 3 {
+		// Few packages — still manageable.
+		score += 0.1
+	}
+
+	// Exact match is easier to refactor than near-duplicate.
 	if class.Similarity >= 1.0 {
 		score += 0.2
+	} else if class.Similarity >= 0.8 {
+		score += 0.1
 	}
 
 	return math.Min(1.0, score)
@@ -206,27 +222,44 @@ func refactorabilityScore(regions []model.SourceRegion, class match.CloneClass) 
 func suggestRefactoring(class match.CloneClass, units []model.NormalizedUnit, regions []model.SourceRegion) []model.RefactorHint {
 	var hints []model.RefactorHint
 
-	if class.Similarity >= 1.0 && len(regions) >= 2 {
+	// Count distinct packages.
+	dirSet := make(map[string]bool)
+	for _, r := range regions {
+		dirSet[filepath.Dir(r.File)] = true
+	}
+	crossPackage := len(dirSet) > 1
+
+	if class.Similarity >= 1.0 && len(regions) >= 3 {
+		if crossPackage {
+			hints = append(hints, model.RefactorHint{
+				Category:    model.RefactorExtractHelper,
+				Description: fmt.Sprintf("Identical structure repeated in %d regions across %d packages. Extract into a shared library.", len(regions), len(dirSet)),
+				Confidence:  0.85,
+			})
+		} else {
+			hints = append(hints, model.RefactorHint{
+				Category:    model.RefactorTableDriven,
+				Description: fmt.Sprintf("Identical structure repeated %d times in the same package. Consider a table-driven approach or shared helper.", len(regions)),
+				Confidence:  0.80,
+			})
+		}
+	} else if class.Similarity >= 1.0 && len(regions) == 2 {
 		hints = append(hints, model.RefactorHint{
 			Category:    model.RefactorExtractHelper,
-			Description: "All regions have identical normalized structure. Extract a shared helper function.",
-			Confidence:  0.8,
+			Description: "Two regions with identical normalized structure. Extract a shared helper function.",
+			Confidence:  0.75,
 		})
-	}
-
-	if class.Similarity >= 0.8 && class.Similarity < 1.0 {
+	} else if class.Similarity >= 0.8 {
 		hints = append(hints, model.RefactorHint{
 			Category:    model.RefactorExtractHelper,
-			Description: "Regions are structurally similar. Consider extracting shared logic with parameters for differences.",
-			Confidence:  0.6,
+			Description: fmt.Sprintf("Regions are %.0f%% similar. Extract shared logic and parameterize the differences.", class.Similarity*100),
+			Confidence:  0.60,
 		})
-	}
-
-	if len(regions) >= 3 && class.Similarity >= 1.0 {
+	} else if class.Similarity >= 0.6 {
 		hints = append(hints, model.RefactorHint{
-			Category:    model.RefactorTableDriven,
-			Description: "Multiple identical regions suggest a table-driven approach could eliminate repetition.",
-			Confidence:  0.7,
+			Category:    model.RefactorInterfaceExtract,
+			Description: fmt.Sprintf("Regions share %.0f%% structure. Consider an interface or strategy pattern to unify.", class.Similarity*100),
+			Confidence:  0.45,
 		})
 	}
 
@@ -234,18 +267,20 @@ func suggestRefactoring(class match.CloneClass, units []model.NormalizedUnit, re
 }
 
 func computeFindingID(regions []model.SourceRegion, cloneType model.CloneType, normLevel model.NormalizationLevel) model.FindingID {
-	sort.Slice(regions, func(i, j int) bool {
-		if regions[i].File != regions[j].File {
-			return regions[i].File < regions[j].File
+	sorted := make([]model.SourceRegion, len(regions))
+	copy(sorted, regions)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].File != sorted[j].File {
+			return sorted[i].File < sorted[j].File
 		}
-		if regions[i].StartLine != regions[j].StartLine {
-			return regions[i].StartLine < regions[j].StartLine
+		if sorted[i].StartLine != sorted[j].StartLine {
+			return sorted[i].StartLine < sorted[j].StartLine
 		}
-		return regions[i].EndLine < regions[j].EndLine
+		return sorted[i].EndLine < sorted[j].EndLine
 	})
 
 	h := sha1.New()
-	for _, r := range regions {
+	for _, r := range sorted {
 		fmt.Fprintf(h, "%s:%d:%d\n", r.File, r.StartLine, r.EndLine)
 	}
 	fmt.Fprintf(h, "type:%d\nlevel:%d\n", cloneType, normLevel)
