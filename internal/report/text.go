@@ -14,14 +14,14 @@ import (
 
 // Result holds the complete analysis output.
 type Result struct {
-	Version       string           `json:"version"`
-	ScanRoot      string           `json:"scan_root"`
-	Timestamp     time.Time        `json:"timestamp"`
-	FilesScanned  int              `json:"files_scanned"`
-	FuncsAnalyzed int              `json:"functions_analyzed"`
-	UnitsAnalyzed int              `json:"units_analyzed"`
-	Duration      time.Duration    `json:"duration_ms"`
-	Findings      []model.Finding  `json:"findings"`
+	Version       string          `json:"version"`
+	ScanRoot      string          `json:"scan_root"`
+	Timestamp     time.Time       `json:"timestamp"`
+	FilesScanned  int             `json:"files_scanned"`
+	FuncsAnalyzed int             `json:"functions_analyzed"`
+	UnitsAnalyzed int             `json:"units_analyzed"`
+	Duration      time.Duration   `json:"duration_ms"`
+	Findings      []model.Finding `json:"findings"`
 }
 
 // WriteText writes a human-readable text report to w.

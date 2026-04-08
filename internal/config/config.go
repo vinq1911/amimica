@@ -227,12 +227,16 @@ func Default() *Config {
 			},
 		},
 		Paths: PathsConfig{
-			Include: []string{"**/*.go"},
+			Include: []string{"**/*.go", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.rb"},
 			Exclude: []string{
 				"vendor/**",
 				"**/*.pb.go",
 				"**/mock_*.go",
 				"**/zz_generated*.go",
+				"**/*.min.js",
+				"**/*.bundle.js",
+				"**/dist/**",
+				"**/build/**",
 			},
 			IncludeTests:     true,
 			IncludeVendor:    false,

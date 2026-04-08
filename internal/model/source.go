@@ -1,6 +1,6 @@
 package model
 
-// SourceFile represents a single Go source file discovered during analysis.
+// SourceFile represents a single source file discovered during analysis.
 // It captures file-level metadata needed throughout the pipeline.
 type SourceFile struct {
 	// Path is the absolute filesystem path to the file.
@@ -9,8 +9,11 @@ type SourceFile struct {
 	// RelPath is the path relative to the scan root.
 	RelPath string
 
-	// Package is the Go package name declared in the file.
+	// Package is the package name declared in the file (Go-specific; may be empty for other languages).
 	Package string
+
+	// Language is the detected language name (e.g., "go", "javascript", "ruby").
+	Language string
 
 	// Module is the Go module path from the nearest go.mod (empty if outside any module).
 	Module string

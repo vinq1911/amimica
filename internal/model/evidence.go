@@ -3,13 +3,13 @@ package model
 // Evidence captures the detailed justification for a clone finding.
 // It answers: what matched, what differed, at what level, and why we call it a clone.
 type Evidence struct {
-	MatchedNormForm   string     `json:"matched_normalized_form,omitempty"`
+	MatchedNormForm   string       `json:"matched_normalized_form,omitempty"`
 	Diffs             []RegionDiff `json:"diffs,omitempty"`
-	SharedTokens      int        `json:"shared_tokens"`
-	TotalTokens       int        `json:"total_tokens"`
-	SimilarityMetric  string     `json:"similarity_metric"`
-	SimilarityValue   float64    `json:"similarity_value"`
-	ContributingNodes []string   `json:"contributing_nodes,omitempty"`
+	SharedTokens      int          `json:"shared_tokens"`
+	TotalTokens       int          `json:"total_tokens"`
+	SimilarityMetric  string       `json:"similarity_metric"`
+	SimilarityValue   float64      `json:"similarity_value"`
+	ContributingNodes []string     `json:"contributing_nodes,omitempty"`
 }
 
 // RegionDiff captures the diff between two specific regions in a clone class.

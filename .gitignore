@@ -22,3 +22,11 @@ Thumbs.db
 
 # Debug profiles
 *.prof
+
+# Planning files (private)
+.planning/
+PLAN.md
+
+# Claude Code config (private)
+.claude/
+CLAUDE.md
