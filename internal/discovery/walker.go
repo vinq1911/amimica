@@ -4,6 +4,7 @@
 package discovery
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"io/fs"
@@ -42,7 +43,8 @@ func Walk(roots []string, cfg *config.Config, registry *lang.Registry, log *slog
 				}
 				if name == ".git" || name == ".amimica" || name == "node_modules" ||
 					name == "__pycache__" || name == ".bundle" || name == ".next" ||
-					name == "dist" || name == "build" {
+					name == "dist" || name == "build" ||
+					name == "tmp" || name == "log" || name == "coverage" {
 					return filepath.SkipDir
 				}
 				return nil
@@ -95,6 +97,12 @@ func Walk(roots []string, cfg *config.Config, registry *lang.Registry, log *slog
 				return nil
 			}
 
+			// Skip minified files (avg line length > 200 chars).
+			if isMinified(content) {
+				log.Debug("skipping minified", "path", relPath)
+				return nil
+			}
+
 			hash := sha256.Sum256(content)
 
 			sf := model.SourceFile{
@@ -117,6 +125,20 @@ func Walk(roots []string, cfg *config.Config, registry *lang.Registry, log *slog
 	}
 
 	return files, nil
+}
+
+// isMinified detects minified JS/CSS files by checking average line length.
+// Minified files have very long lines (often >1000 chars) because whitespace is stripped.
+func isMinified(content []byte) bool {
+	if len(content) < 500 {
+		return false // too small to tell
+	}
+	lines := bytes.Count(content, []byte("\n"))
+	if lines == 0 {
+		lines = 1
+	}
+	avgLen := len(content) / lines
+	return avgLen > 200
 }
 
 func matchesAny(relPath string, patterns []string) bool {
