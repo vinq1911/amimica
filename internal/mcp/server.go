@@ -288,17 +288,26 @@ type listFindingsArgs struct {
 	Offset   int     `json:"offset,omitempty"`
 }
 
+// lookupScan retrieves a stored scan result or returns an error response.
+func (s *Server) lookupScan(id any, scanID string) (*report.Result, *jsonrpcResponse) {
+	s.mu.RLock()
+	result, ok := s.results[scanID]
+	s.mu.RUnlock()
+	if !ok {
+		return nil, s.toolError(id, "scan_id not found: "+scanID)
+	}
+	return result, nil
+}
+
 func (s *Server) handleListFindings(id any, raw json.RawMessage) *jsonrpcResponse {
 	var args listFindingsArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return s.respondError(id, -32602, "invalid arguments", nil)
 	}
 
-	s.mu.RLock()
-	result, ok := s.results[args.ScanID]
-	s.mu.RUnlock()
-	if !ok {
-		return s.toolError(id, "scan_id not found: "+args.ScanID)
+	result, errResp := s.lookupScan(id, args.ScanID)
+	if errResp != nil {
+		return errResp
 	}
 
 	if args.Limit == 0 {
@@ -360,11 +369,9 @@ func (s *Server) handleExplainFinding(id any, raw json.RawMessage) *jsonrpcRespo
 		return s.respondError(id, -32602, "invalid arguments", nil)
 	}
 
-	s.mu.RLock()
-	result, ok := s.results[args.ScanID]
-	s.mu.RUnlock()
-	if !ok {
-		return s.toolError(id, "scan_id not found: "+args.ScanID)
+	result, errResp := s.lookupScan(id, args.ScanID)
+	if errResp != nil {
+		return errResp
 	}
 
 	for _, f := range result.Findings {

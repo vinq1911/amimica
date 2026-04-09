@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/user/amimica/internal/config"
 	"github.com/user/amimica/internal/logging"
 	"github.com/user/amimica/internal/mcp"
 )
@@ -21,23 +20,16 @@ func RunServeMCP(args []string) int {
 		return 2
 	}
 
-	cfg, err := config.Load(*configPath)
+	cfg, err := loadConfig(*configPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "amimica: config error: %v\n", err)
-		return 2
+		return exitError(err, 2)
 	}
-	config.ApplyEnv(cfg)
 
 	// MCP uses stdio for JSON-RPC, so logs must go to a file or be suppressed.
 	if *logFile == "" {
-		cfg.Logging.Level = "error" // suppress info logs on stderr during MCP
+		cfg.Logging.Level = "error"
 	}
 	log := logging.Setup(cfg.Logging.Level, cfg.Logging.Format)
-
-	if *logFile != "" {
-		// Redirect slog to file — but for now just use stderr with reduced level.
-		log = logging.Setup(cfg.Logging.Level, cfg.Logging.Format)
-	}
 
 	server := mcp.NewServer(cfg, log)
 	if err := server.Serve(); err != nil {

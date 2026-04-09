@@ -5,12 +5,12 @@ package extract
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 	"go/ast"
 	"go/token"
 	"strings"
 
 	"github.com/user/amimica/internal/config"
+	"github.com/user/amimica/internal/lang"
 	"github.com/user/amimica/internal/model"
 	"github.com/user/amimica/internal/normalize"
 	"github.com/user/amimica/internal/parser"
@@ -87,7 +87,7 @@ func hasIgnoreDirective(fn *ast.FuncDecl) bool {
 }
 
 func makeUnit(tokens []model.NormToken, region model.SourceRegion, kind model.UnitKind, level model.NormalizationLevel, stmtCount, nodeCount int) model.NormalizedUnit {
-	tokenHash := hashTokens(tokens)
+	tokenHash := lang.HashTokens(tokens)
 	id := sha256.Sum256(append(tokenHash[:], []byte(region.File)...))
 
 	return model.NormalizedUnit{
@@ -97,22 +97,10 @@ func makeUnit(tokens []model.NormToken, region model.SourceRegion, kind model.Un
 		NormTokens: tokens,
 		NormLevel:  level,
 		TokenHash:  tokenHash,
-		ASTHash:    tokenHash, // In v1, AST hash equals token hash.
+		ASTHash:    tokenHash,
 		StmtCount:  stmtCount,
 		NodeCount:  nodeCount,
 	}
-}
-
-func hashTokens(tokens []model.NormToken) [32]byte {
-	h := sha256.New()
-	for _, t := range tokens {
-		_ = binary.Write(h, binary.BigEndian, int32(t.Kind))
-		h.Write([]byte(t.Norm))
-		h.Write([]byte{0})
-	}
-	var result [32]byte
-	copy(result[:], h.Sum(nil))
-	return result
 }
 
 func funcRegion(pf *parser.ParsedFile, fn *ast.FuncDecl) model.SourceRegion {

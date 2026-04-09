@@ -37,12 +37,10 @@ func RunScan(args []string) int {
 	}
 
 	// Load config.
-	cfg, err := config.Load(*configPath)
+	cfg, err := loadConfig(*configPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "amimica: config error: %v\n", err)
-		return 2
+		return exitError(err, 2)
 	}
-	config.ApplyEnv(cfg)
 
 	// Apply flag overrides.
 	if *outputFmt != "" {
@@ -79,13 +77,10 @@ func RunScan(args []string) int {
 		cfg.Logging.Level = "debug"
 	}
 
-	// Validate config.
 	if err := config.Validate(cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "amimica: invalid config: %v\n", err)
-		return 2
+		return exitError(fmt.Errorf("invalid config: %w", err), 2)
 	}
 
-	// Setup logging.
 	log := logging.Setup(cfg.Logging.Level, cfg.Logging.Format)
 
 	// Determine scan roots.
