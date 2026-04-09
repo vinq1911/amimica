@@ -388,6 +388,24 @@ make run ARGS="scan ."  # Build and run
 - Go 1.25+ (to build from source)
 - golangci-lint (optional, for `make lint`)
 
+## Contributing
+
+All contributions are welcome! Bug fixes, new language support, detection improvements, documentation — open a PR.
+
+```bash
+# Fork, clone, create a branch
+git checkout -b my-feature
+
+# Make changes, then verify
+make check          # fmt + vet + test
+make run ARGS="scan ."  # smoke test
+
+# Push and open a PR
+git push origin my-feature
+```
+
+If you're adding a new language, see `internal/lang/` for the `Language` interface and existing implementations (Go, JS/TS, Ruby) as examples.
+
 ## License
 
 MIT
