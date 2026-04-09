@@ -35,6 +35,7 @@ func (l *Lang) IsGeneratedFile(content []byte) bool {
 	return lang.IsGeneratedContent(content)
 }
 
+// amimica-ignore: language-specific entry point; shared structure is intentional (each lang tokenizes differently)
 func (l *Lang) ParseAndExtract(sf model.SourceFile, cfg *config.Config, level model.NormalizationLevel, log *slog.Logger) ([]model.NormalizedUnit, error) {
 	content, err := os.ReadFile(sf.Path)
 	if err != nil {

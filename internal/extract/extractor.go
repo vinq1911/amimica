@@ -86,6 +86,7 @@ func hasIgnoreDirective(fn *ast.FuncDecl) bool {
 	return false
 }
 
+// amimica-ignore: differs from lang.MakeUnit by accepting nodeCount from Go AST (not just len(tokens))
 func makeUnit(tokens []model.NormToken, region model.SourceRegion, kind model.UnitKind, level model.NormalizationLevel, stmtCount, nodeCount int) model.NormalizedUnit {
 	tokenHash := lang.HashTokens(tokens)
 	id := sha256.Sum256(append(tokenHash[:], []byte(region.File)...))
