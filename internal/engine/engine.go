@@ -11,8 +11,10 @@ import (
 	"github.com/user/amimica/internal/config"
 	"github.com/user/amimica/internal/discovery"
 	"github.com/user/amimica/internal/lang"
+	"github.com/user/amimica/internal/lang/csharp"
 	golanguage "github.com/user/amimica/internal/lang/golang"
 	"github.com/user/amimica/internal/lang/javascript"
+	"github.com/user/amimica/internal/lang/objc"
 	"github.com/user/amimica/internal/lang/ruby"
 	"github.com/user/amimica/internal/match"
 	"github.com/user/amimica/internal/model"
@@ -26,6 +28,8 @@ func DefaultRegistry() *lang.Registry {
 	r.Register(golanguage.New())
 	r.Register(javascript.New())
 	r.Register(ruby.New())
+	r.Register(objc.New())
+	r.Register(csharp.New())
 	return r
 }
 

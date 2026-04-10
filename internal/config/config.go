@@ -227,7 +227,10 @@ func Default() *Config {
 			},
 		},
 		Paths: PathsConfig{
-			Include: []string{"**/*.go", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.rb"},
+			Include: []string{
+				"**/*.go", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx",
+				"**/*.rb", "**/*.m", "**/*.mm", "**/*.cs",
+			},
 			Exclude: []string{
 				"vendor/**",
 				"**/*.pb.go",
@@ -243,6 +246,9 @@ func Default() *Config {
 				"**/public/vite-dev/**",
 				"**/public/assets/**",
 				"**/coverage/**",
+				"**/obj/**",
+				"**/*.Designer.cs",
+				"**/*.g.cs",
 			},
 			IncludeTests:     true,
 			IncludeVendor:    false,
