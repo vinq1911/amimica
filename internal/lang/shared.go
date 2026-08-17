@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/user/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/model"
 )
 
 // MakeUnit creates a NormalizedUnit from a token sequence and region.

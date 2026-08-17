@@ -11,7 +11,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/user/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/model"
 )
 
 // ParsedFile holds the AST and metadata for a single parsed Go source file.

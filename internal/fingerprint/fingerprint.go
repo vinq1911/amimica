@@ -8,7 +8,7 @@ import (
 	"hash/fnv"
 	"math"
 
-	"github.com/user/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/model"
 )
 
 // ComputeShingles computes n-gram hashes over a normalized token sequence.

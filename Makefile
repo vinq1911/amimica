@@ -7,7 +7,7 @@ COMMIT     := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 GOBIN      := bin
 BINARY     := $(GOBIN)/amimica
-MODULE     := github.com/user/amimica
+MODULE     := github.com/vinq1911/amimica
 LDFLAGS    := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildDate=$(BUILD_DATE)
 
 # Tools

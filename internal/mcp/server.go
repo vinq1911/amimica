@@ -18,10 +18,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/user/amimica/internal/config"
-	"github.com/user/amimica/internal/engine"
-	"github.com/user/amimica/internal/model"
-	"github.com/user/amimica/internal/report"
+	"github.com/vinq1911/amimica/internal/config"
+	"github.com/vinq1911/amimica/internal/engine"
+	"github.com/vinq1911/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/report"
 )
 
 // Clone type short codes (saves ~10 tokens per finding vs full names).

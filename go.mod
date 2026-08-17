@@ -1,4 +1,4 @@
-module github.com/user/amimica
+module github.com/vinq1911/amimica
 
 go 1.25.1
 

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/user/amimica/internal/logging"
-	"github.com/user/amimica/internal/mcp"
+	"github.com/vinq1911/amimica/internal/logging"
+	"github.com/vinq1911/amimica/internal/mcp"
 )
 
 // RunServeMCP implements the "serve-mcp" subcommand.

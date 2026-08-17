@@ -10,7 +10,7 @@ import (
 	"go/token"
 	"strconv"
 
-	"github.com/user/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/model"
 )
 
 // Normalizer transforms Go AST nodes into normalized token sequences.
