@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/user/amimica/internal/config"
+	"github.com/vinq1911/amimica/internal/config"
 )
 
 // loadConfig loads configuration from a file path and applies environment

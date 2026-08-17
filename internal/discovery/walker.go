@@ -13,9 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/user/amimica/internal/config"
-	"github.com/user/amimica/internal/lang"
-	"github.com/user/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/config"
+	"github.com/vinq1911/amimica/internal/lang"
+	"github.com/vinq1911/amimica/internal/model"
 )
 
 // Walk discovers source files under the given roots, applying filtering

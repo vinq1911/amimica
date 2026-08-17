@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"path/filepath"
 
-	"github.com/user/amimica/internal/config"
-	"github.com/user/amimica/internal/fingerprint"
-	"github.com/user/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/config"
+	"github.com/vinq1911/amimica/internal/fingerprint"
+	"github.com/vinq1911/amimica/internal/model"
 )
 
 // CloneClass represents a group of code units that are clones of each other.

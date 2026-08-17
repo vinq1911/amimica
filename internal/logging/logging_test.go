@@ -3,7 +3,7 @@ package logging_test
 import (
 	"testing"
 
-	"github.com/user/amimica/internal/logging"
+	"github.com/vinq1911/amimica/internal/logging"
 )
 
 func TestSetupReturnsLogger(t *testing.T) {

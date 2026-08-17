@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/user/amimica/internal/fsguard"
+	"github.com/vinq1911/amimica/internal/fsguard"
 )
 
 // setupTempRoot creates a temporary directory structure for testing.

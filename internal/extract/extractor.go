@@ -9,11 +9,11 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/user/amimica/internal/config"
-	"github.com/user/amimica/internal/lang"
-	"github.com/user/amimica/internal/model"
-	"github.com/user/amimica/internal/normalize"
-	"github.com/user/amimica/internal/parser"
+	"github.com/vinq1911/amimica/internal/config"
+	"github.com/vinq1911/amimica/internal/lang"
+	"github.com/vinq1911/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/normalize"
+	"github.com/vinq1911/amimica/internal/parser"
 )
 
 // Extract produces NormalizedUnits from a parsed file at the given normalization level.

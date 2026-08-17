@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/user/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/model"
 )
 
 // Result holds the complete analysis output.

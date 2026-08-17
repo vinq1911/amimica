@@ -8,10 +8,10 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/user/amimica/internal/config"
-	"github.com/user/amimica/internal/engine"
-	"github.com/user/amimica/internal/logging"
-	"github.com/user/amimica/internal/report"
+	"github.com/vinq1911/amimica/internal/config"
+	"github.com/vinq1911/amimica/internal/engine"
+	"github.com/vinq1911/amimica/internal/logging"
+	"github.com/vinq1911/amimica/internal/report"
 )
 
 // RunScan implements the "scan" subcommand.

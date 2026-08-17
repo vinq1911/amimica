@@ -8,10 +8,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/user/amimica/internal/config"
-	"github.com/user/amimica/internal/extract"
-	"github.com/user/amimica/internal/model"
-	"github.com/user/amimica/internal/parser"
+	"github.com/vinq1911/amimica/internal/config"
+	"github.com/vinq1911/amimica/internal/extract"
+	"github.com/vinq1911/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/parser"
 )
 
 var generatedMarker = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.$`)

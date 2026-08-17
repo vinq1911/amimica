@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/user/amimica/internal/config"
-	"github.com/user/amimica/internal/extract"
-	"github.com/user/amimica/internal/match"
-	"github.com/user/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/config"
+	"github.com/vinq1911/amimica/internal/extract"
+	"github.com/vinq1911/amimica/internal/match"
+	"github.com/vinq1911/amimica/internal/model"
 )
 
 // ScoreFindings converts clone classes into scored findings, then deduplicates

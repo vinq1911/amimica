@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/user/amimica/internal/app"
+	"github.com/vinq1911/amimica/internal/app"
 )
 
 // Build-time variables injected via ldflags. See Makefile.

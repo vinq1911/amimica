@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/user/amimica/internal/config"
+	"github.com/vinq1911/amimica/internal/config"
 )
 
 func TestDefaultReturnsPopulatedConfig(t *testing.T) {

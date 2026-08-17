@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/user/amimica/internal/config"
-	"github.com/user/amimica/internal/model"
+	"github.com/vinq1911/amimica/internal/config"
+	"github.com/vinq1911/amimica/internal/model"
 )
 
 // Language encapsulates all language-specific logic for clone detection.
